@@ -1,0 +1,84 @@
+model_version: "1.0"
+extension:
+  id: dev.kiket.ext.mailjet-inbound
+  name: Mailjet Inbound
+  version: 1.0.0
+  description: Process inbound emails from Mailjet Parse API and create issues or comments
+  author: Kiket Team
+  homepage: https://github.com/kiket-dev/kiket-ext-mailjet-inbound
+  sdk: ruby
+  delivery: http
+  callback:
+    url: ${EXTENSION_BASE_URL}
+    secret: env.KIKET_WEBHOOK_SECRET
+    timeout: 30000
+    required: true
+  activationEvents:
+    - email.inbound
+  permissions:
+    - issues:write
+    - comments:write
+    - users:read
+  capabilities:
+    - email-to-issue
+  hooks:
+    - event: email.inbound
+      timeout: 30000
+      retries: 2
+      description: Process inbound email from Mailjet
+  configuration:
+    default_project_key:
+      type: string
+      label: Default Project Key
+      description: Project key to create issues in when not specified in email
+    default_issue_type:
+      type: string
+      default: "Task"
+      label: Default Issue Type
+      description: Issue type for new issues created from emails
+    create_from_unknown_senders:
+      type: boolean
+      default: "false"
+      label: Accept Unknown Senders
+      description: Create issues from emails sent by non-registered users
+  setup:
+    - configure:
+        title: Configure Email Processing
+        description: Set up how inbound emails are processed
+        fields:
+          - key: default_project_key
+            type: text
+            label: Default Project
+            description: Project key for new issues
+            required: true
+          - key: default_issue_type
+            type: select
+            label: Default Issue Type
+            options:
+              - { value: Task, label: Task }
+              - { value: Bug, label: Bug }
+              - { value: UserStory, label: User Story }
+            default: Task
+          - key: create_from_unknown_senders
+            type: boolean
+            label: Accept Unknown Senders
+            default: false
+    - info:
+        title: Setup Complete
+        content: |
+          ## Mailjet Webhook Configuration
+
+          Configure your Mailjet Parse API to forward emails to:
+
+          ```
+          ${EXTENSION_BASE_URL}/webhooks/email.inbound
+          ```
+
+          See the [Mailjet Parse API documentation](https://dev.mailjet.com/email/guides/parse-api/) for setup instructions.
+        links:
+          - label: Mailjet Parse API Docs
+            url: https://dev.mailjet.com/email/guides/parse-api/
+            icon: book
+  assets:
+    icon: ./public/icon.svg
+  hosting: internal

@@ -1,0 +1,34 @@
+# frozen_string_literal: true
+
+require "bundler/setup"
+Bundler.require(:default, :test)
+
+require "rack/test"
+require "webmock/rspec"
+require "dotenv"
+
+Dotenv.load(".env.test")
+
+ENV["RACK_ENV"] = "test"
+ENV["KIKET_BASE_URL"] ||= "https://kiket.test"
+ENV["KIKET_WORKSPACE_TOKEN"] ||= "wk_test_token"
+
+require_relative "../app"
+
+RSpec.configure do |config|
+  config.include Rack::Test::Methods
+
+  config.expect_with :rspec do |expectations|
+    expectations.include_chain_clauses_in_custom_matcher_descriptions = true
+  end
+
+  config.mock_with :rspec do |mocks|
+    mocks.verify_partial_doubles = true
+  end
+
+  config.shared_context_metadata_behavior = :apply_to_host_groups
+  config.filter_run_when_matching :focus
+  config.disable_monkey_patching!
+  config.order = :random
+  Kernel.srand config.seed
+end

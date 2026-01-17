@@ -1,0 +1,71 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Extension CI script
+# Runs linting, security checks, and tests
+
+require "open3"
+
+class ExtensionCI
+  EXTENSION_NAME = "mailjet-inbound"
+
+  def initialize
+    @results = []
+    @failed = false
+  end
+
+  def run
+    puts "=" * 60
+    puts "Running CI for #{EXTENSION_NAME}"
+    puts "=" * 60
+
+    Dir.chdir(File.expand_path("..", __dir__)) do
+      step("Install dependencies", "bundle install --quiet")
+      step("Lint: Rubocop", "bundle exec rubocop --format simple")
+      step("Tests: RSpec", "bundle exec rspec --format progress")
+    end
+
+    print_summary
+    exit(@failed ? 1 : 0)
+  end
+
+  private
+
+  def step(name, command)
+    print "  #{name}... "
+
+    # Clear parent bundler environment to use extension's own Gemfile
+    clean_env = ENV.to_h.reject { |k, _| k.start_with?("BUNDLE_") }
+    clean_env["BUNDLE_GEMFILE"] = File.expand_path("Gemfile", Dir.pwd)
+
+    start_time = Time.now
+    stdout, stderr, status = Open3.capture3(clean_env, command)
+    duration = (Time.now - start_time).round(2)
+
+    if status.success?
+      puts "✓ (#{duration}s)"
+      @results << { name: name, success: true, duration: duration }
+    else
+      puts "✗ (#{duration}s)"
+      @results << { name: name, success: false, duration: duration, output: stdout + stderr }
+      @failed = true
+
+      puts "\n    Output:"
+      (stdout + stderr).lines.first(20).each { |line| puts "    #{line}" }
+      puts "    ... (truncated)" if (stdout + stderr).lines.count > 20
+      puts
+    end
+  end
+
+  def print_summary
+    puts "\n" + "=" * 60
+    passed = @results.count { |r| r[:success] }
+    total = @results.size
+    status = @failed ? "FAILED" : "PASSED"
+
+    puts "#{EXTENSION_NAME}: #{status} (#{passed}/#{total} steps)"
+    puts "=" * 60
+  end
+end
+
+ExtensionCI.new.run

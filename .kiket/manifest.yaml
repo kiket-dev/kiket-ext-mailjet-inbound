@@ -2,7 +2,7 @@ model_version: "1.0"
 extension:
   id: dev.kiket.ext.mailjet-inbound
   name: Mailjet Inbound
-  version: 1.0.0
+  version: 1.1.0
   description: Process inbound emails from Mailjet Parse API and create issues or comments
   author: Kiket Team
   homepage: https://github.com/kiket-dev/kiket-ext-mailjet-inbound
@@ -14,18 +14,19 @@ extension:
     timeout: 30000
     required: true
   activationEvents:
-    - email.inbound
+    - external.webhook.inbound_email
   permissions:
     - issues:write
     - comments:write
     - users:read
   capabilities:
     - email-to-issue
+    - external-webhook
   hooks:
-    - event: email.inbound
+    - event: external.webhook.inbound_email
       timeout: 30000
       retries: 2
-      description: Process inbound email from Mailjet
+      description: Process inbound email from Mailjet via External Webhook Routing
   configuration:
     default_project_key:
       type: string
@@ -41,6 +42,11 @@ extension:
       default: "false"
       label: Accept Unknown Senders
       description: Create issues from emails sent by non-registered users
+  secrets:
+    - key: MAILJET_WEBHOOK_TOKEN
+      label: Mailjet Webhook Token
+      description: Optional token for verifying webhooks from Mailjet
+      required: false
   setup:
     - configure:
         title: Configure Email Processing
@@ -68,17 +74,46 @@ extension:
         content: |
           ## Mailjet Webhook Configuration
 
-          Configure your Mailjet Parse API to forward emails to:
+          Configure your Mailjet Parse API to forward emails to your Kiket webhook URL.
 
-          ```
-          ${EXTENSION_BASE_URL}/webhooks/email.inbound
+          ### Step 1: Get Your Webhook URL
+
+          After installation, retrieve your webhook URL from the Kiket API:
+
+          ```bash
+          curl -H "X-Kiket-Runtime-Token: $RUNTIME_TOKEN" \
+            https://kiket.dev/api/v1/ext/webhook_url?action_name=inbound_email
           ```
 
-          See the [Mailjet Parse API documentation](https://dev.mailjet.com/email/guides/parse-api/) for setup instructions.
+          This returns a URL like:
+          ```
+          https://kiket.dev/webhooks/ext/{webhook_token}/inbound_email
+          ```
+
+          ### Step 2: Configure Mailjet Parse API
+
+          1. Go to [Mailjet Dashboard](https://app.mailjet.com) → **Transactional** → **Parse API**
+          2. Click **Add a new route**
+          3. Configure:
+             - **Email pattern:** `*@inbound.kiket.dev`
+             - **Webhook URL:** Your Kiket webhook URL from Step 1
+             - **Method:** POST
+
+          ### Step 3: Add DNS MX Record
+
+          Add an MX record for your inbound domain:
+          ```
+          inbound.kiket.dev.  MX  10  parse.mailjet.com.
+          ```
+
+          See the [Mailjet Parse API documentation](https://dev.mailjet.com/email/guides/parse-api/) for more details.
         links:
           - label: Mailjet Parse API Docs
             url: https://dev.mailjet.com/email/guides/parse-api/
             icon: book
+          - label: External Webhook Routing Docs
+            url: https://docs.kiket.dev/extensions/external-webhook-routing
+            icon: link
   assets:
     icon: ./public/icon.svg
   hosting: internal

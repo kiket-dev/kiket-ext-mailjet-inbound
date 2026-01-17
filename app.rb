@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "kiket_sdk"
+require 'rackup'
 require "json"
 require "logger"
 
@@ -186,7 +187,7 @@ end
 if __FILE__ == $PROGRAM_NAME
   extension = MailjetInboundExtension.new
 
-  Rack::Handler::Puma.run(
+  Rackup::Handler.get(:puma).run(
     extension.app,
     Host: ENV.fetch("HOST", "0.0.0.0"),
     Port: ENV.fetch("PORT", 8080).to_i,

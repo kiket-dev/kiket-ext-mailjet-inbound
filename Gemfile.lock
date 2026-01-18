@@ -1,6 +1,6 @@
 GIT
   remote: https://github.com/kiket-dev/kiket-ruby-sdk.git
-  revision: cf8d360af88c408d54314f1fd5fcee20c8d50533
+  revision: c8ae8ae95f4685d735de81f2f52d0384ab81b3d0
   branch: main
   specs:
     kiket-sdk (0.1.0)
@@ -8,7 +8,7 @@ GIT
       faraday-retry (~> 2.2)
       jwt (~> 2.7)
       psych (~> 5.1)
-      puma (~> 6.4)
+      puma (>= 6.4, < 8)
       rackup (~> 2.1)
       sinatra (~> 4.0)
 
@@ -55,7 +55,7 @@ GEM
       date
       stringio
     public_suffix (7.0.2)
-    puma (6.6.1)
+    puma (7.1.0)
       nio4r (~> 2.0)
     racc (1.8.1)
     rack (3.2.4)
@@ -159,7 +159,7 @@ CHECKSUMS
   prism (1.8.0) sha256=84453a16ef5530ea62c5f03ec16b52a459575ad4e7b9c2b360fd8ce2c39c1254
   psych (5.3.1) sha256=eb7a57cef10c9d70173ff74e739d843ac3b2c019a003de48447b2963d81b1974
   public_suffix (7.0.2) sha256=9114090c8e4e7135c1fd0e7acfea33afaab38101884320c65aaa0ffb8e26a857
-  puma (6.6.1) sha256=b9b56e4a4ea75d1bfa6d9e1972ee2c9f43d0883f011826d914e8e37b3694ea1e
+  puma (7.1.0) sha256=e45c10cb124f224d448c98db653a75499794edbecadc440ad616cf50f2fd49dd
   racc (1.8.1) sha256=4a7f6929691dbec8b5209a0b373bc2614882b55fc5d2e447a21aaa691303d62f
   rack (3.2.4) sha256=5d74b6f75082a643f43c1e76b419c40f0e5527fcfee1e669ac1e6b73c0ccb6f6
   rack-protection (4.2.1) sha256=cf6e2842df8c55f5e4d1a4be015e603e19e9bc3a7178bae58949ccbb58558bac

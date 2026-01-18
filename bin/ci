@@ -20,7 +20,7 @@ class ExtensionCI
     puts "=" * 60
 
     Dir.chdir(File.expand_path("..", __dir__)) do
-      step("Install dependencies", "bundle install --quiet")
+      step("Setup", "bin/setup")
       step("Lint: Rubocop", "bundle exec rubocop --format simple")
       step("Tests: RSpec", "bundle exec rspec --format progress")
     end

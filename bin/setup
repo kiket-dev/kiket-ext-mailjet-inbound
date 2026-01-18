@@ -1,0 +1,37 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Extension setup script
+# Installs dependencies and prepares the extension for development/CI
+
+require "fileutils"
+
+EXTENSION_ROOT = File.expand_path("..", __dir__)
+EXTENSION_NAME = File.basename(EXTENSION_ROOT)
+
+def system!(*args, **kwargs)
+  system(*args, **kwargs, exception: true)
+end
+
+FileUtils.chdir EXTENSION_ROOT do
+  puts "== Setting up #{EXTENSION_NAME} extension =="
+
+  # Clear parent bundler environment to use extension's own Gemfile
+  ENV.keys.grep(/^BUNDLE_/).each { |k| ENV.delete(k) }
+  ENV["BUNDLE_GEMFILE"] = File.join(EXTENSION_ROOT, "Gemfile")
+
+  puts "\n== Installing dependencies =="
+  if File.exist?("Gemfile.lock")
+    system("bundle check") || system!("bundle install")
+  else
+    system!("bundle install")
+  end
+
+  # Install npm dependencies if package.json exists
+  if File.exist?("package.json")
+    puts "\n== Installing npm dependencies =="
+    system!("npm install")
+  end
+
+  puts "\n== Setup complete =="
+end

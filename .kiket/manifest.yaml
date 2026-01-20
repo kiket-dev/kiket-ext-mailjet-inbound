@@ -28,12 +28,12 @@ extension:
       retries: 2
       description: Process inbound email from Mailjet via External Webhook Routing
   configuration:
-    default_project_key:
-      type: string
-      label: Default Project Key
-      description: Project key to create issues in when not specified in email
+    default_project_id:
+      type: project
+      label: Default Project
+      description: Project where new issues will be created from emails
     default_issue_type:
-      type: string
+      type: issue_type
       default: "Task"
       label: Default Issue Type
       description: Issue type for new issues created from emails
@@ -52,18 +52,15 @@ extension:
         title: Configure Email Processing
         description: Set up how inbound emails are processed
         fields:
-          - key: default_project_key
-            type: text
+          - key: default_project_id
+            type: project
             label: Default Project
-            description: Project key for new issues
+            description: Project where new issues will be created
             required: true
           - key: default_issue_type
-            type: select
+            type: issue_type
             label: Default Issue Type
-            options:
-              - { value: Task, label: Task }
-              - { value: Bug, label: Bug }
-              - { value: UserStory, label: User Story }
+            description: Issue type to create from incoming emails (options from your workflow definition)
             default: Task
           - key: create_from_unknown_senders
             type: boolean

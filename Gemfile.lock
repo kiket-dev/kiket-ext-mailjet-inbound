@@ -1,6 +1,6 @@
 GIT
   remote: https://github.com/kiket-dev/kiket-ruby-sdk.git
-  revision: c8ae8ae95f4685d735de81f2f52d0384ab81b3d0
+  revision: af0090259d7cee948224a4bf6f41cebf2a148233
   branch: main
   specs:
     kiket-sdk (0.1.0)

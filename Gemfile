@@ -16,5 +16,6 @@ group :development, :test do
   gem "rack-test", "~> 2.1"
   gem "webmock", "~> 3.23"
   gem "rubocop", "~> 1.69"
+  gem "rubocop-rspec", "~> 3.0"
   gem "dotenv", "~> 3.1"
 end

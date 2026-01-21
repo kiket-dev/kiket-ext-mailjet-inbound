@@ -7,6 +7,9 @@ ruby "~> 3.4"
 # Kiket SDK for extension development
 gem "kiket-sdk", github: "kiket-dev/kiket-ruby-sdk", branch: "main"
 
+# Mailjet API client for automated Parse API setup
+gem "mailjet", "~> 1.8"
+
 # Development and testing
 group :development, :test do
   gem "rspec", "~> 3.13"

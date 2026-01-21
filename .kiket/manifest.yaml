@@ -2,7 +2,7 @@ model_version: "1.0"
 extension:
   id: dev.kiket.ext.mailjet-inbound
   name: Mailjet Inbound
-  version: 1.1.0
+  version: 1.2.0
   description: Process inbound emails from Mailjet Parse API and create issues or comments
   author: Kiket Team
   homepage: https://github.com/kiket-dev/kiket-ext-mailjet-inbound
@@ -42,12 +42,43 @@ extension:
       default: "false"
       label: Accept Unknown Senders
       description: Create issues from emails sent by non-registered users
+    mailjet_inbound_email:
+      type: text
+      label: Mailjet Inbound Email
+      description: The email address configured in Mailjet (set automatically during setup)
+      readonly: true
   secrets:
+    - key: MAILJET_API_KEY
+      label: Mailjet API Key
+      description: Your Mailjet API key (from Account Settings → API Key Management)
+      required: true
+    - key: MAILJET_SECRET_KEY
+      label: Mailjet Secret Key
+      description: Your Mailjet Secret key
+      required: true
     - key: MAILJET_WEBHOOK_TOKEN
       label: Mailjet Webhook Token
-      description: Optional token for verifying webhooks from Mailjet
+      description: Optional token for additional webhook verification
       required: false
   setup:
+    # Step 1: Mailjet API Credentials
+    - secrets:
+        title: Mailjet API Credentials
+        description: |
+          Enter your Mailjet API credentials to enable automatic setup.
+
+          **Note:** Parse API requires a paid Mailjet plan (Crystal or above).
+
+          Find your credentials at [Mailjet Dashboard](https://app.mailjet.com) → **Account Settings** → **API Key Management**.
+        fields:
+          - key: MAILJET_API_KEY
+            label: API Key
+            required: true
+          - key: MAILJET_SECRET_KEY
+            label: Secret Key
+            required: true
+
+    # Step 2: Email Processing Configuration
     - configure:
         title: Configure Email Processing
         description: Set up how inbound emails are processed
@@ -60,54 +91,63 @@ extension:
           - key: default_issue_type
             type: issue_type
             label: Default Issue Type
-            description: Issue type to create from incoming emails (options from your workflow definition)
+            description: Issue type to create from incoming emails
             default: Task
           - key: create_from_unknown_senders
             type: boolean
             label: Accept Unknown Senders
             default: false
+
+    # Step 3: Connect to Mailjet
+    - test:
+        title: Connect to Mailjet
+        description: |
+          Click the button below to automatically configure Mailjet Parse API.
+
+          This will create a parse route in your Mailjet account that forwards
+          inbound emails to Kiket.
+        action: mailjet.connectParseApi
+        successMessage: Successfully connected to Mailjet! Your parse route is configured.
+        required: true
+
+    # Step 4: DNS Setup Instructions
     - info:
-        title: Setup Complete
+        title: Final Step - DNS Configuration
         content: |
-          ## Mailjet Webhook Configuration
+          ## DNS Setup Required
 
-          Configure your Mailjet Parse API to forward emails to your Kiket webhook URL.
+          Your Mailjet Parse API is now configured. The final step is to set up DNS
+          so that emails are routed to Mailjet.
 
-          ### Step 1: Get Your Webhook URL
+          ### Add MX Record
 
-          Your webhook URL is shown in **Project Settings** → **Extensions** → **Mailjet Inbound** → **Configure**.
+          Add an MX record for your inbound email domain:
 
-          Copy the **External Webhook URL** displayed in the sidebar.
+          ```
+          inbound.yourdomain.com.  MX  10  parse.mailjet.com.
+          ```
 
-          ### Step 2: Configure Mailjet Parse API
+          Replace `inbound.yourdomain.com` with your actual inbound domain.
 
-          The Parse API is configured via Mailjet's REST API (requires Crystal plan or above).
+          ### Verify DNS Propagation
 
-          Get your API credentials from **Mailjet Dashboard** → **Account Settings** → **API Key Management**.
-
-          Create a parse route:
           ```bash
-          curl -X POST \
-            --user "$MJ_API_KEY:$MJ_SECRET_KEY" \
-            https://api.mailjet.com/v3/REST/parseroute \
-            -H "Content-Type: application/json" \
-            -d '{"Url": "YOUR_WEBHOOK_URL", "Email": "incoming@inbound.kiket.dev"}' | jq .
+          dig MX inbound.yourdomain.com +short
+          # Expected: 10 parse.mailjet.com.
           ```
 
-          ### Step 3: Add DNS MX Record
+          DNS changes may take up to 48 hours to propagate.
 
-          Add an MX record for your inbound domain:
-          ```
-          inbound.kiket.dev.  MX  10  parse.mailjet.com.
-          ```
+          ### Your Inbound Email Address
 
-          See the [Mailjet Parse API documentation](https://dev.mailjet.com/email/guides/parse-api/) for more details.
+          Once DNS is configured, emails sent to your configured address will
+          automatically create issues in Kiket.
         links:
           - label: Mailjet Parse API Docs
             url: https://dev.mailjet.com/email/guides/parse-api/
             icon: book
-          - label: External Webhook Routing Docs
-            url: https://docs.kiket.dev/extensions/external-webhook-routing
+          - label: DNS Checker
+            url: https://dnschecker.org/
             icon: link
   assets:
     icon: ./public/icon.svg

@@ -1,20 +1,26 @@
 # frozen_string_literal: true
 
 require "kiket_sdk"
-require 'rackup'
+require "rackup"
 require "json"
 require "logger"
+require "mailjet"
 
 # Mailjet Inbound Email Extension
 # Receives emails from Mailjet Parse API via External Webhook Routing and creates issues/comments in Kiket
 #
-# New architecture (External Webhook Routing):
+# Features:
+# - Automatic Mailjet Parse API setup via customer's Mailjet credentials
+# - Processes inbound emails and creates issues/comments in Kiket
+# - Supports sender policy enforcement
+#
+# Architecture (External Webhook Routing):
 # 1. Mailjet sends webhooks to Kiket's external webhook URL: /webhooks/ext/:webhook_token/inbound_email
 # 2. Kiket forwards to this extension with a runtime token (external.webhook.inbound_email event)
 # 3. Extension processes the payload and calls Kiket API using the runtime token
-#
-# This eliminates the need for Extension API Keys - runtime tokens provide per-invocation auth.
 class MailjetInboundExtension
+  class MailjetAPIError < StandardError; end
+
   def initialize
     @sdk = KiketSDK.new
     @logger = Logger.new($stdout)
@@ -29,11 +35,137 @@ class MailjetInboundExtension
 
   def setup_handlers
     # Handle external webhook events from Mailjet (routed through Kiket)
-    # Event type: external.webhook.inbound_email
     @sdk.register("external.webhook.inbound_email", version: "v1", required_scopes: %w[issues:write]) do |payload, context|
       process_mailjet_webhook(payload, context)
     end
+
+    # Setup action: Connect to Mailjet Parse API
+    @sdk.register("mailjet.connectParseApi", version: "v1", required_scopes: %w[configuration:write]) do |payload, context|
+      connect_parse_api(payload, context)
+    end
   end
+
+  # ============================================================================
+  # Setup Action: Connect to Mailjet Parse API
+  # ============================================================================
+
+  def connect_parse_api(payload, context)
+    # Get Mailjet credentials from secrets
+    api_key = context[:secret].call("MAILJET_API_KEY")
+    secret_key = context[:secret].call("MAILJET_SECRET_KEY")
+
+    if api_key.nil? || api_key.empty? || secret_key.nil? || secret_key.empty?
+      return { success: false, error: "Missing Mailjet API credentials. Please configure MAILJET_API_KEY and MAILJET_SECRET_KEY in secrets." }
+    end
+
+    # Configure Mailjet client
+    configure_mailjet(api_key, secret_key)
+
+    # Get the webhook URL from Kiket
+    webhook_info = context[:client].get("/api/v1/ext/webhook_url", { action_name: "inbound_email" })
+    webhook_url = webhook_info["webhook_url"]
+
+    if webhook_url.nil? || webhook_url.empty?
+      return { success: false, error: "Could not retrieve webhook URL from Kiket" }
+    end
+
+    # Determine the inbound email address
+    # Use organization subdomain or project key for uniqueness
+    org_subdomain = payload.dig("organization", "subdomain") || payload.dig("project", "key")&.downcase
+    inbound_email = if org_subdomain && !org_subdomain.empty?
+      "#{org_subdomain}@inbound.kiket.dev"
+    else
+      # Fall back to Mailjet's auto-generated address
+      nil
+    end
+
+    # Check for existing parse routes
+    existing_route = find_existing_route(webhook_url)
+
+    if existing_route
+      # Update existing route if URL changed
+      @logger.info "Found existing Mailjet parse route: #{existing_route.email}"
+      return {
+        success: true,
+        message: "Parse route already configured",
+        email: existing_route.email,
+        route_id: existing_route.id
+      }
+    end
+
+    # Create new parse route
+    route = create_parse_route(webhook_url, inbound_email)
+
+    # Store the inbound email in configuration for reference
+    if route.email
+      context[:client].patch("/api/v1/ext/configuration", {
+        configuration: { mailjet_inbound_email: route.email }
+      })
+    end
+
+    context[:endpoints].log_event("mailjet.parse_route.created", {
+      email: route.email,
+      route_id: route.id
+    })
+
+    {
+      success: true,
+      message: "Successfully configured Mailjet Parse API",
+      email: route.email,
+      route_id: route.id
+    }
+  rescue Mailjet::ApiError => e
+    @logger.error "Mailjet API error: #{e.message}"
+    error_message = parse_mailjet_error(e)
+    { success: false, error: "Mailjet API error: #{error_message}" }
+  rescue StandardError => e
+    @logger.error "Error connecting to Mailjet: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
+    { success: false, error: e.message }
+  end
+
+  def configure_mailjet(api_key, secret_key)
+    Mailjet.configure do |config|
+      config.api_key = api_key
+      config.secret_key = secret_key
+      config.api_version = "v3"
+    end
+  end
+
+  def find_existing_route(webhook_url)
+    routes = Mailjet::Parseroute.all
+    # Find route that points to our webhook URL (or contains our webhook token)
+    webhook_token = webhook_url.split("/webhooks/ext/").last&.split("/")&.first
+    routes.find do |route|
+      route.url == webhook_url || (webhook_token && route.url&.include?(webhook_token))
+    end
+  rescue Mailjet::ApiError => e
+    @logger.warn "Could not list existing parse routes: #{e.message}"
+    nil
+  end
+
+  def create_parse_route(webhook_url, inbound_email = nil)
+    params = { url: webhook_url }
+    params[:email] = inbound_email if inbound_email
+
+    Mailjet::Parseroute.create(params)
+  end
+
+  def parse_mailjet_error(error)
+    # Try to extract meaningful error message from Mailjet API response
+    if error.message.include?("401")
+      "Invalid API credentials. Please check your MAILJET_API_KEY and MAILJET_SECRET_KEY."
+    elsif error.message.include?("403")
+      "Access denied. Your Mailjet plan may not include Parse API (requires Crystal plan or above)."
+    elsif error.message.include?("already exists")
+      "A parse route with this configuration already exists."
+    else
+      error.message
+    end
+  end
+
+  # ============================================================================
+  # Inbound Email Processing
+  # ============================================================================
 
   def process_mailjet_webhook(payload, context)
     # Extract the original Mailjet webhook data from external_webhook envelope

@@ -27,10 +27,15 @@ This extension receives emails forwarded by Mailjet's Parse API through Kiket's 
 With External Webhook Routing:
 1. Mailjet sends webhooks to Kiket's external webhook URL
 2. Kiket issues a **runtime token** and forwards to this extension
-3. Extension uses the runtime token for authenticated API calls
+3. Extension processes the payload and calls Kiket API using the runtime token
 4. **No Extension API Keys required** - runtime tokens provide per-invocation auth
 
 ## Setup
+
+### Prerequisites
+
+- A Mailjet account with a **paid plan** (Crystal or above) that includes Parse API
+- Your Mailjet API credentials (API Key and Secret Key)
 
 ### 1. Install the Extension
 
@@ -40,55 +45,48 @@ Install the extension from the Kiket Marketplace or via CLI:
 kiket extension install dev.kiket.ext.mailjet-inbound
 ```
 
-### 2. Get Your Webhook URL
+### 2. Configure via Setup Wizard
 
-After installation, retrieve your unique webhook URL. You can do this:
+The setup wizard will guide you through:
 
-**Via Kiket UI:**
-- Go to **Project Settings** → **Extensions** → **Mailjet Inbound** → **Webhook URL**
+1. **Mailjet API Credentials** - Enter your API Key and Secret Key from [Mailjet Dashboard](https://app.mailjet.com) → **Account Settings** → **API Key Management**
 
-**Via API:**
-```bash
-# Using a runtime token (from extension invocation context)
-curl -H "X-Kiket-Runtime-Token: $RUNTIME_TOKEN" \
-  "https://kiket.dev/api/v1/ext/webhook_url?action_name=inbound_email"
-```
+2. **Email Processing Settings** - Configure:
+   - Default project for new issues
+   - Default issue type
+   - Whether to accept emails from unknown senders
 
-This returns:
-```json
-{
-  "webhook_url": "https://kiket.dev/webhooks/ext/abc123token/inbound_email",
-  "webhook_token": "abc123token",
-  "webhook_base_url": "https://kiket.dev/webhooks/ext/abc123token"
-}
-```
+3. **Connect to Mailjet** - Click the button to automatically create the Parse API route in your Mailjet account
+
+4. **DNS Configuration** - Follow the instructions to set up MX records
 
 ### 3. Configure DNS
 
 Add an MX record for your inbound email domain:
 
 ```
-inbound.kiket.dev.  MX  10  parse.mailjet.com.
+inbound.yourdomain.com.  MX  10  parse.mailjet.com.
 ```
 
 Verify propagation:
 ```bash
-dig MX inbound.kiket.dev +short
+dig MX inbound.yourdomain.com +short
 # Expected: 10 parse.mailjet.com.
 ```
 
-### 4. Configure Mailjet Parse API
+DNS changes may take up to 48 hours to propagate.
 
-The Parse API is configured via Mailjet's REST API. You'll need your Mailjet API credentials.
+## Manual Setup (Alternative)
 
-> **Note:** Parse API requires a paid Mailjet plan (Crystal or above).
+If you prefer to configure Mailjet manually instead of using the automated setup:
 
-**Get your API credentials:**
-1. Log in to [Mailjet Dashboard](https://app.mailjet.com)
-2. Go to **Account Settings** → **API Key Management**
-3. Copy your API Key and Secret Key
+### Get Your Webhook URL
 
-**Create a parse route:**
+After installation, find your webhook URL in **Project Settings** → **Extensions** → **Mailjet Inbound** → **Configure**.
+
+Copy the **External Webhook URL** displayed in the sidebar.
+
+### Create Parse Route via API
 
 ```bash
 export MAILJET_API_KEY="your_api_key"
@@ -100,41 +98,11 @@ curl -X POST \
   -H "Content-Type: application/json" \
   -d '{
     "Url": "https://kiket.dev/webhooks/ext/YOUR_TOKEN/inbound_email",
-    "Email": "incoming@inbound.kiket.dev"
+    "Email": "incoming@inbound.yourdomain.com"
   }' | jq .
 ```
 
-Replace:
-- `your_api_key` and `your_secret_key` with your Mailjet credentials
-- `YOUR_TOKEN` with your webhook token from Step 2
-- `incoming@inbound.kiket.dev` with your desired inbound email address
-
-**Verify the route was created:**
-
-```bash
-curl --user "$MAILJET_API_KEY:$MAILJET_SECRET_KEY" \
-  https://api.mailjet.com/v3/REST/parseroute | jq .
-```
-
 For more details, see the [Mailjet Parse API documentation](https://dev.mailjet.com/email/guides/parse-api/).
-
-### 5. (Optional) Additional Security
-
-**Use HTTPS with Basic Auth:**
-
-Mailjet recommends using basic authentication in your webhook URL for added security:
-
-```bash
-curl -s -X POST \
-  --user "$MAILJET_API_KEY:$MAILJET_SECRET_KEY" \
-  https://api.mailjet.com/v3/REST/parseroute \
-  -d '{
-    "Url": "https://username:password@kiket.dev/webhooks/ext/YOUR_TOKEN/inbound_email",
-    "Email": "incoming@inbound.kiket.dev"
-  }'
-```
-
-> **Note:** Kiket's webhook URLs are already protected by unique tokens. Basic auth provides an additional layer of security but is optional.
 
 ## Email Routing
 
@@ -147,14 +115,9 @@ The local part (e.g., `support`, `bugs`) is matched against `EmailAddressMapping
 
 ## Token Rotation
 
-If your webhook URL is compromised, you can rotate the token:
+If your webhook URL is compromised, you can rotate the token in **Project Settings** → **Extensions** → **Mailjet Inbound** → **Configure** → **Rotate**.
 
-```bash
-curl -X POST -H "X-Kiket-Runtime-Token: $RUNTIME_TOKEN" \
-  "https://kiket.dev/api/v1/ext/webhook_url/rotate"
-```
-
-This returns a new webhook URL. Remember to update your Mailjet configuration.
+After rotating, you'll need to update your Mailjet Parse route with the new URL.
 
 ## Development
 
@@ -220,9 +183,25 @@ Health check endpoint.
 {
   "status": "ok",
   "extension_id": "dev.kiket.ext.mailjet-inbound",
-  "registered_events": ["external.webhook.inbound_email"]
+  "registered_events": ["external.webhook.inbound_email", "mailjet.connectParseApi"]
 }
 ```
+
+## Troubleshooting
+
+### "Access denied" or 403 error during setup
+
+Your Mailjet plan may not include Parse API. Parse API requires a paid plan (Crystal or above).
+
+### "Invalid API credentials" error
+
+Double-check your MAILJET_API_KEY and MAILJET_SECRET_KEY. You can find these in [Mailjet Dashboard](https://app.mailjet.com) → **Account Settings** → **API Key Management**.
+
+### Emails not being received
+
+1. Verify DNS MX records are correctly configured: `dig MX yourdomain.com +short`
+2. Check that the Parse route was created in Mailjet
+3. Verify the webhook URL is correct in Mailjet's Parse route
 
 ## License
 

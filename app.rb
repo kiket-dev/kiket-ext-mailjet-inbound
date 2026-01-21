@@ -68,19 +68,13 @@ class MailjetInboundExtension
     webhook_info = context[:client].get('/api/v1/ext/webhook_url?action_name=inbound_email')
     webhook_url = webhook_info['webhook_url']
 
-    if webhook_url.nil? || webhook_url.empty?
-      return { success: false, error: 'Could not retrieve webhook URL from Kiket' }
-    end
+    return { success: false, error: 'Could not retrieve webhook URL from Kiket' } if webhook_url.nil? || webhook_url.empty?
 
     # Determine the inbound email address
     # Use organization subdomain or project key for uniqueness
     org_subdomain = payload.dig('organization', 'subdomain') || payload.dig('project', 'key')&.downcase
-    inbound_email = if org_subdomain && !org_subdomain.empty?
-                      "#{org_subdomain}@inbound.kiket.dev"
-                    else
-                      # Fall back to Mailjet's auto-generated address
-                      nil
-                    end
+    # Fall back to Mailjet's auto-generated address if no subdomain
+    inbound_email = "#{org_subdomain}@inbound.kiket.dev" if org_subdomain && !org_subdomain.empty?
 
     # Check for existing parse routes
     existing_route = find_existing_route(webhook_url)
@@ -187,7 +181,7 @@ class MailjetInboundExtension
     expected_token = context[:secret].call('MAILJET_WEBHOOK_TOKEN')
     if expected_token && !expected_token.empty?
       received_token = headers['X-Mailjet-Token'] || payload.dig('external_webhook', 'query_params', 'token')
-      unless received_token && secure_compare(received_token, expected_token)
+      unless received_token && secure_match?(received_token, expected_token)
         @logger.warn 'Mailjet webhook token verification failed'
         return { ok: false, error: 'Unauthorized' }
       end
@@ -318,10 +312,10 @@ class MailjetInboundExtension
     end
   end
 
-  def secure_compare(a, b)
-    return false unless a.bytesize == b.bytesize
+  def secure_match?(expected, actual)
+    return false unless expected.bytesize == actual.bytesize
 
-    a.bytes.zip(b.bytes).reduce(0) { |sum, (x, y)| sum | (x ^ y) }.zero?
+    expected.bytes.zip(actual.bytes).reduce(0) { |sum, (exp, act)| sum | (exp ^ act) }.zero?
   end
 end
 

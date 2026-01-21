@@ -7,7 +7,7 @@
 require 'open3'
 
 class ExtensionCI
-  EXTENSION_NAME = File.basename(File.expand_path("..", __dir__))
+  EXTENSION_NAME = File.basename(File.expand_path('..', __dir__))
 
   def initialize
     @results = []

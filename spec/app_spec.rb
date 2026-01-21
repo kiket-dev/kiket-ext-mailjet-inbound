@@ -135,7 +135,7 @@ RSpec.describe MailjetInboundExtension do
     context 'with webhook token verification' do
       before do
         # Simulate MAILJET_WEBHOOK_TOKEN secret being present
-        allow_any_instance_of(described_class).to receive(:secure_compare) do |_instance, a, b|
+        allow_any_instance_of(described_class).to receive(:secure_match?) do |_instance, a, b|
           a == b
         end
       end

@@ -15,10 +15,9 @@ AllCops:
   TargetRubyVersion: 3.4
   Exclude:
     - 'vendor/**/*'
+    - 'Gemfile'
 
-# Relaxed settings for extension code
-# Extensions tend to have self-contained, verbose code
-
+# Relaxed limits for extension code
 Metrics/BlockLength:
   Exclude:
     - 'spec/**/*'
@@ -27,7 +26,7 @@ Metrics/ClassLength:
   Max: 300
 
 Metrics/MethodLength:
-  Max: 60
+  Max: 50
 
 Metrics/AbcSize:
   Max: 50
@@ -41,15 +40,6 @@ Metrics/PerceivedComplexity:
 Layout/LineLength:
   Max: 150
 
-Style/EmptyElse:
-  Enabled: false
-
-Style/Documentation:
-  Enabled: false
-
-Style/IfUnlessModifier:
-  Enabled: false
-
 # RSpec settings
 RSpec/ExampleLength:
   Max: 40
@@ -60,23 +50,22 @@ RSpec/MultipleExpectations:
 RSpec/NestedGroups:
   Max: 4
 
-RSpec/VerifiedDoubles:
+RSpec/SpecFilePathFormat:
   Enabled: false
 
 RSpec/AnyInstance:
   Enabled: false
 
-RSpec/MessageSpies:
+RSpec/VerifiedDoubles:
   Enabled: false
 
 RSpec/StubbedMock:
   Enabled: false
 
-RSpec/SpecFilePathFormat:
+RSpec/MessageSpies:
   Enabled: false
 
-Naming/PredicateMethod:
-  Enabled: false
-
-Naming/MethodParameterName:
-  MinNameLength: 1
+# Allow classes without documentation in scripts
+Style/Documentation:
+  Exclude:
+    - 'bin/**/*'

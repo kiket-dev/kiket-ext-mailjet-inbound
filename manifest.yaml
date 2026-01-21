@@ -1,0 +1,6 @@
+# SDK-compatible flat manifest for testing
+# The actual extension manifest is in .kiket/manifest.yaml
+id: dev.kiket.ext.mailjet-inbound
+version: "1.2.0"
+delivery_secret: KIKET_WEBHOOK_SECRET
+settings: []

@@ -13,6 +13,9 @@ ENV["RACK_ENV"] = "test"
 ENV["KIKET_BASE_URL"] ||= "https://kiket.test"
 ENV["KIKET_WORKSPACE_TOKEN"] ||= "wk_test_token"
 
+# Change to extension root directory so manifest can be loaded
+Dir.chdir(File.expand_path("..", __dir__))
+
 require_relative "../app"
 
 RSpec.configure do |config|

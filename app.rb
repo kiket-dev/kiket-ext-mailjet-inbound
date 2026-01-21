@@ -62,7 +62,7 @@ class MailjetInboundExtension
     configure_mailjet(api_key, secret_key)
 
     # Get the webhook URL from Kiket
-    webhook_info = context[:client].get("/api/v1/ext/webhook_url", { action_name: "inbound_email" })
+    webhook_info = context[:client].get("/api/v1/ext/webhook_url?action_name=inbound_email")
     webhook_url = webhook_info["webhook_url"]
 
     if webhook_url.nil? || webhook_url.empty?
@@ -139,6 +139,9 @@ class MailjetInboundExtension
       route.url == webhook_url || (webhook_token && route.url&.include?(webhook_token))
     end
   rescue Mailjet::ApiError => e
+    # Re-raise authentication/authorization errors - these won't succeed on retry
+    raise if [401, 403].include?(e.code)
+
     @logger.warn "Could not list existing parse routes: #{e.message}"
     nil
   end
@@ -152,14 +155,18 @@ class MailjetInboundExtension
 
   def parse_mailjet_error(error)
     # Try to extract meaningful error message from Mailjet API response
-    if error.message.include?("401")
+    # Mailjet::ApiError has code, body, request, url, params attributes
+    code = error.respond_to?(:code) ? error.code : nil
+    message = error.message || ""
+
+    if code == 401 || message.include?("401")
       "Invalid API credentials. Please check your MAILJET_API_KEY and MAILJET_SECRET_KEY."
-    elsif error.message.include?("403")
+    elsif code == 403 || message.include?("403")
       "Access denied. Your Mailjet plan may not include Parse API (requires Crystal plan or above)."
-    elsif error.message.include?("already exists")
+    elsif message.include?("already exists")
       "A parse route with this configuration already exists."
     else
-      error.message
+      message
     end
   end
 

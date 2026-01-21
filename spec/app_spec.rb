@@ -67,12 +67,18 @@ RSpec.describe MailjetInboundExtension do
       "proj_id" => 1
     })
 
-    # Stub API calls
+    # Stub API calls with proper Content-Type for Faraday JSON middleware
     stub_request(:post, "https://kiket.test/api/v1/ext/inbound_emails")
-      .to_return(status: 200, body: { id: 123, status: "pending" }.to_json)
+      .to_return(status: 200, body: { id: 123, status: "pending" }.to_json, headers: { "Content-Type" => "application/json" })
 
-    stub_request(:post, %r{https://kiket.test/api/v1/ext/events})
-      .to_return(status: 200, body: { ok: true }.to_json)
+    # SDK calls /extensions/:extension_id/events for log_event
+    # Extension ID comes from manifest (dev.kiket.ext.mailjet-inbound)
+    stub_request(:post, %r{https://kiket.test/extensions/.*/events})
+      .to_return(status: 200, body: { ok: true }.to_json, headers: { "Content-Type" => "application/json" })
+
+    # SDK telemetry endpoint
+    stub_request(:post, "https://kiket.test/api/v1/ext/telemetry")
+      .to_return(status: 200, body: { ok: true }.to_json, headers: { "Content-Type" => "application/json" })
   end
 
   describe "POST /v/v1/webhooks/external.webhook.inbound_email" do
@@ -235,16 +241,15 @@ RSpec.describe MailjetInboundExtension do
 
     before do
       # Stub Kiket API for webhook URL
-      stub_request(:get, "https://kiket.test/api/v1/ext/webhook_url")
-        .with(query: { "action_name" => "inbound_email" })
+      stub_request(:get, "https://kiket.test/api/v1/ext/webhook_url?action_name=inbound_email")
         .to_return(status: 200, body: {
           webhook_url: webhook_url,
           webhook_token: "abc123token"
-        }.to_json)
+        }.to_json, headers: { "Content-Type" => "application/json" })
 
       # Stub Kiket API for configuration update
       stub_request(:patch, "https://kiket.test/api/v1/ext/configuration")
-        .to_return(status: 200, body: { ok: true }.to_json)
+        .to_return(status: 200, body: { ok: true }.to_json, headers: { "Content-Type" => "application/json" })
     end
 
     context "with valid credentials" do
@@ -328,7 +333,8 @@ RSpec.describe MailjetInboundExtension do
 
         make_setup_request(payload)
 
-        expect(WebMock).to have_requested(:post, %r{https://kiket.test/api/v1/ext/events})
+        # SDK calls /extensions/:extension_id/events for log_event
+        expect(WebMock).to have_requested(:post, %r{https://kiket.test/extensions/.*/events})
       end
     end
 
@@ -404,7 +410,7 @@ RSpec.describe MailjetInboundExtension do
 
       it "handles 401 unauthorized error" do
         allow(Mailjet::Parseroute).to receive(:all)
-          .and_raise(Mailjet::ApiError.new("401 Unauthorized"))
+          .and_raise(Mailjet::ApiError.new(401, "Unauthorized", nil, "https://api.mailjet.com", {}))
 
         payload = build_setup_payload(secrets: secrets)
         make_setup_request(payload)
@@ -416,7 +422,7 @@ RSpec.describe MailjetInboundExtension do
 
       it "handles 403 forbidden error" do
         allow(Mailjet::Parseroute).to receive(:all)
-          .and_raise(Mailjet::ApiError.new("403 Forbidden"))
+          .and_raise(Mailjet::ApiError.new(403, "Forbidden", nil, "https://api.mailjet.com", {}))
 
         payload = build_setup_payload(secrets: secrets)
         make_setup_request(payload)
@@ -427,8 +433,12 @@ RSpec.describe MailjetInboundExtension do
       end
 
       it "handles generic Mailjet errors" do
+        # Generic errors (non-auth) are caught in find_existing_route, so code proceeds to create
+        # We need to stub create as well to simulate the error
         allow(Mailjet::Parseroute).to receive(:all)
-          .and_raise(Mailjet::ApiError.new("Something went wrong"))
+          .and_raise(Mailjet::ApiError.new(500, "Something went wrong", nil, "https://api.mailjet.com", {}))
+        allow(Mailjet::Parseroute).to receive(:create)
+          .and_raise(Mailjet::ApiError.new(500, "Something went wrong", nil, "https://api.mailjet.com", {}))
 
         payload = build_setup_payload(secrets: secrets)
         make_setup_request(payload)
@@ -448,9 +458,8 @@ RSpec.describe MailjetInboundExtension do
       end
 
       before do
-        stub_request(:get, "https://kiket.test/api/v1/ext/webhook_url")
-          .with(query: { "action_name" => "inbound_email" })
-          .to_return(status: 200, body: { webhook_url: nil }.to_json)
+        stub_request(:get, "https://kiket.test/api/v1/ext/webhook_url?action_name=inbound_email")
+          .to_return(status: 200, body: { webhook_url: nil }.to_json, headers: { "Content-Type" => "application/json" })
       end
 
       it "returns error" do

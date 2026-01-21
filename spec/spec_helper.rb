@@ -1,22 +1,22 @@
 # frozen_string_literal: true
 
-require "bundler/setup"
+require 'bundler/setup'
 Bundler.require(:default, :test)
 
-require "rack/test"
-require "webmock/rspec"
-require "dotenv"
+require 'rack/test'
+require 'webmock/rspec'
+require 'dotenv'
 
-Dotenv.load(".env.test")
+Dotenv.load('.env.test')
 
-ENV["RACK_ENV"] = "test"
-ENV["KIKET_BASE_URL"] ||= "https://kiket.test"
-ENV["KIKET_WORKSPACE_TOKEN"] ||= "wk_test_token"
+ENV['RACK_ENV'] = 'test'
+ENV['KIKET_BASE_URL'] ||= 'https://kiket.test'
+ENV['KIKET_WORKSPACE_TOKEN'] ||= 'wk_test_token'
 
 # Change to extension root directory so manifest can be loaded
-Dir.chdir(File.expand_path("..", __dir__))
+Dir.chdir(File.expand_path('..', __dir__))
 
-require_relative "../app"
+require_relative '../app'
 
 RSpec.configure do |config|
   config.include Rack::Test::Methods

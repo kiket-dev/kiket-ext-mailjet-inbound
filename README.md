@@ -79,29 +79,62 @@ dig MX inbound.kiket.dev +short
 
 ### 4. Configure Mailjet Parse API
 
+The Parse API is configured via Mailjet's REST API. You'll need your Mailjet API credentials.
+
+> **Note:** Parse API requires a paid Mailjet plan (Crystal or above).
+
+**Get your API credentials:**
 1. Log in to [Mailjet Dashboard](https://app.mailjet.com)
-2. Navigate to **Transactional** → **Parse API**
-3. Click **Add a new route**
-4. Configure:
-   - **Email pattern:** `*@inbound.kiket.dev`
-   - **Webhook URL:** Your Kiket webhook URL from Step 2 (e.g., `https://kiket.dev/webhooks/ext/abc123token/inbound_email`)
-   - **Method:** POST
-5. Save the route
+2. Go to **Account Settings** → **API Key Management**
+3. Copy your API Key and Secret Key
 
-### 5. (Optional) Configure Webhook Verification
+**Create a parse route:**
 
-For additional security, configure a webhook token:
+```bash
+export MAILJET_API_KEY="your_api_key"
+export MAILJET_SECRET_KEY="your_secret_key"
 
-1. Generate a token:
-   ```bash
-   openssl rand -hex 32
-   ```
+curl -X POST \
+  --user "$MAILJET_API_KEY:$MAILJET_SECRET_KEY" \
+  https://api.mailjet.com/v3/REST/parseroute \
+  -H "Content-Type: application/json" \
+  -d '{
+    "Url": "https://kiket.dev/webhooks/ext/YOUR_TOKEN/inbound_email",
+    "Email": "incoming@inbound.kiket.dev"
+  }' | jq .
+```
 
-2. Store in Kiket extension secrets:
-   - Go to **Project Settings** → **Extensions** → **Mailjet Inbound** → **Secrets**
-   - Add `MAILJET_WEBHOOK_TOKEN` with your generated token
+Replace:
+- `your_api_key` and `your_secret_key` with your Mailjet credentials
+- `YOUR_TOKEN` with your webhook token from Step 2
+- `incoming@inbound.kiket.dev` with your desired inbound email address
 
-3. Configure Mailjet to include the token in a custom header `X-Mailjet-Token`
+**Verify the route was created:**
+
+```bash
+curl --user "$MAILJET_API_KEY:$MAILJET_SECRET_KEY" \
+  https://api.mailjet.com/v3/REST/parseroute | jq .
+```
+
+For more details, see the [Mailjet Parse API documentation](https://dev.mailjet.com/email/guides/parse-api/).
+
+### 5. (Optional) Additional Security
+
+**Use HTTPS with Basic Auth:**
+
+Mailjet recommends using basic authentication in your webhook URL for added security:
+
+```bash
+curl -s -X POST \
+  --user "$MAILJET_API_KEY:$MAILJET_SECRET_KEY" \
+  https://api.mailjet.com/v3/REST/parseroute \
+  -d '{
+    "Url": "https://username:password@kiket.dev/webhooks/ext/YOUR_TOKEN/inbound_email",
+    "Email": "incoming@inbound.kiket.dev"
+  }'
+```
+
+> **Note:** Kiket's webhook URLs are already protected by unique tokens. Basic auth provides an additional layer of security but is optional.
 
 ## Email Routing
 

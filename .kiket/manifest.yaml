@@ -75,26 +75,24 @@ extension:
 
           ### Step 1: Get Your Webhook URL
 
-          After installation, retrieve your webhook URL from the Kiket API:
+          Your webhook URL is shown in **Project Settings** → **Extensions** → **Mailjet Inbound** → **Configure**.
 
-          ```bash
-          curl -H "X-Kiket-Runtime-Token: $RUNTIME_TOKEN" \
-            https://kiket.dev/api/v1/ext/webhook_url?action_name=inbound_email
-          ```
-
-          This returns a URL like:
-          ```
-          https://kiket.dev/webhooks/ext/{webhook_token}/inbound_email
-          ```
+          Copy the **External Webhook URL** displayed in the sidebar.
 
           ### Step 2: Configure Mailjet Parse API
 
-          1. Go to [Mailjet Dashboard](https://app.mailjet.com) → **Transactional** → **Parse API**
-          2. Click **Add a new route**
-          3. Configure:
-             - **Email pattern:** `*@inbound.kiket.dev`
-             - **Webhook URL:** Your Kiket webhook URL from Step 1
-             - **Method:** POST
+          The Parse API is configured via Mailjet's REST API (requires Crystal plan or above).
+
+          Get your API credentials from **Mailjet Dashboard** → **Account Settings** → **API Key Management**.
+
+          Create a parse route:
+          ```bash
+          curl -X POST \
+            --user "$MJ_API_KEY:$MJ_SECRET_KEY" \
+            https://api.mailjet.com/v3/REST/parseroute \
+            -H "Content-Type: application/json" \
+            -d '{"Url": "YOUR_WEBHOOK_URL", "Email": "incoming@inbound.kiket.dev"}' | jq .
+          ```
 
           ### Step 3: Add DNS MX Record
 

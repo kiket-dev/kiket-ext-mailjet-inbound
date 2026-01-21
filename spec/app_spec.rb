@@ -28,8 +28,31 @@ RSpec.describe MailjetInboundExtension do
     }
   end
 
+  def build_setup_payload(secrets: {}, organization: {}, project: {})
+    {
+      "event" => "mailjet.connectParseApi",
+      "action" => "connectParseApi",
+      "received_at" => Time.now.iso8601,
+      "authentication" => {
+        "runtime_token" => "test_runtime_token_abc123"
+      },
+      "api" => {
+        "base_url" => "https://kiket.test"
+      },
+      "secrets" => secrets,
+      "organization" => organization,
+      "project" => project
+    }
+  end
+
   def make_webhook_request(payload, headers = {})
     post "/v/v1/webhooks/external.webhook.inbound_email", payload.to_json, {
+      "CONTENT_TYPE" => "application/json"
+    }.merge(headers)
+  end
+
+  def make_setup_request(payload, headers = {})
+    post "/v/v1/webhooks/mailjet.connectParseApi", payload.to_json, {
       "CONTENT_TYPE" => "application/json"
     }.merge(headers)
   end
@@ -204,6 +227,243 @@ RSpec.describe MailjetInboundExtension do
     end
   end
 
+  describe "POST /v/v1/webhooks/mailjet.connectParseApi" do
+    let(:webhook_url) { "https://kiket.dev/webhooks/ext/abc123token/inbound_email" }
+    let(:parseroute_response) do
+      double("Parseroute", id: 12345, email: "acme@parse-in1.mailjet.com", url: webhook_url)
+    end
+
+    before do
+      # Stub Kiket API for webhook URL
+      stub_request(:get, "https://kiket.test/api/v1/ext/webhook_url")
+        .with(query: { "action_name" => "inbound_email" })
+        .to_return(status: 200, body: {
+          webhook_url: webhook_url,
+          webhook_token: "abc123token"
+        }.to_json)
+
+      # Stub Kiket API for configuration update
+      stub_request(:patch, "https://kiket.test/api/v1/ext/configuration")
+        .to_return(status: 200, body: { ok: true }.to_json)
+    end
+
+    context "with valid credentials" do
+      let(:secrets) do
+        {
+          "MAILJET_API_KEY" => "test_api_key",
+          "MAILJET_SECRET_KEY" => "test_secret_key"
+        }
+      end
+
+      before do
+        # Stub Mailjet API
+        allow(Mailjet::Parseroute).to receive(:all).and_return([])
+        allow(Mailjet::Parseroute).to receive(:create).and_return(parseroute_response)
+      end
+
+      it "creates a new parse route" do
+        payload = build_setup_payload(
+          secrets: secrets,
+          organization: { "subdomain" => "acme" }
+        )
+
+        make_setup_request(payload)
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["success"]).to eq(true)
+        expect(body["email"]).to eq("acme@parse-in1.mailjet.com")
+        expect(body["route_id"]).to eq(12345)
+      end
+
+      it "configures Mailjet with provided credentials" do
+        payload = build_setup_payload(secrets: secrets)
+
+        expect(Mailjet).to receive(:configure).and_yield(double.as_null_object)
+
+        make_setup_request(payload)
+      end
+
+      it "uses organization subdomain for inbound email" do
+        payload = build_setup_payload(
+          secrets: secrets,
+          organization: { "subdomain" => "acme" }
+        )
+
+        expect(Mailjet::Parseroute).to receive(:create)
+          .with(hash_including(email: "acme@inbound.kiket.dev"))
+          .and_return(parseroute_response)
+
+        make_setup_request(payload)
+      end
+
+      it "falls back to project key for inbound email" do
+        payload = build_setup_payload(
+          secrets: secrets,
+          organization: {},
+          project: { "key" => "PROJ" }
+        )
+
+        expect(Mailjet::Parseroute).to receive(:create)
+          .with(hash_including(email: "proj@inbound.kiket.dev"))
+          .and_return(parseroute_response)
+
+        make_setup_request(payload)
+      end
+
+      it "stores inbound email in configuration" do
+        payload = build_setup_payload(secrets: secrets)
+
+        make_setup_request(payload)
+
+        expect(WebMock).to have_requested(:patch, "https://kiket.test/api/v1/ext/configuration")
+          .with { |req|
+            body = JSON.parse(req.body)
+            body["configuration"]["mailjet_inbound_email"] == "acme@parse-in1.mailjet.com"
+          }
+      end
+
+      it "logs parse route creation event" do
+        payload = build_setup_payload(secrets: secrets)
+
+        make_setup_request(payload)
+
+        expect(WebMock).to have_requested(:post, %r{https://kiket.test/api/v1/ext/events})
+      end
+    end
+
+    context "when parse route already exists" do
+      let(:secrets) do
+        {
+          "MAILJET_API_KEY" => "test_api_key",
+          "MAILJET_SECRET_KEY" => "test_secret_key"
+        }
+      end
+
+      let(:existing_route) do
+        double("Parseroute", id: 99999, email: "existing@parse-in1.mailjet.com", url: webhook_url)
+      end
+
+      before do
+        allow(Mailjet::Parseroute).to receive(:all).and_return([existing_route])
+      end
+
+      it "returns existing route without creating new one" do
+        payload = build_setup_payload(secrets: secrets)
+
+        expect(Mailjet::Parseroute).not_to receive(:create)
+
+        make_setup_request(payload)
+
+        body = JSON.parse(last_response.body)
+        expect(body["success"]).to eq(true)
+        expect(body["message"]).to eq("Parse route already configured")
+        expect(body["route_id"]).to eq(99999)
+      end
+    end
+
+    context "with missing credentials" do
+      it "returns error when API key is missing" do
+        payload = build_setup_payload(secrets: { "MAILJET_SECRET_KEY" => "secret" })
+
+        make_setup_request(payload)
+
+        body = JSON.parse(last_response.body)
+        expect(body["success"]).to eq(false)
+        expect(body["error"]).to include("Missing Mailjet API credentials")
+      end
+
+      it "returns error when secret key is missing" do
+        payload = build_setup_payload(secrets: { "MAILJET_API_KEY" => "key" })
+
+        make_setup_request(payload)
+
+        body = JSON.parse(last_response.body)
+        expect(body["success"]).to eq(false)
+        expect(body["error"]).to include("Missing Mailjet API credentials")
+      end
+
+      it "returns error when both credentials are missing" do
+        payload = build_setup_payload(secrets: {})
+
+        make_setup_request(payload)
+
+        body = JSON.parse(last_response.body)
+        expect(body["success"]).to eq(false)
+        expect(body["error"]).to include("Missing Mailjet API credentials")
+      end
+    end
+
+    context "with Mailjet API errors" do
+      let(:secrets) do
+        {
+          "MAILJET_API_KEY" => "invalid_key",
+          "MAILJET_SECRET_KEY" => "invalid_secret"
+        }
+      end
+
+      it "handles 401 unauthorized error" do
+        allow(Mailjet::Parseroute).to receive(:all)
+          .and_raise(Mailjet::ApiError.new("401 Unauthorized"))
+
+        payload = build_setup_payload(secrets: secrets)
+        make_setup_request(payload)
+
+        body = JSON.parse(last_response.body)
+        expect(body["success"]).to eq(false)
+        expect(body["error"]).to include("Invalid API credentials")
+      end
+
+      it "handles 403 forbidden error" do
+        allow(Mailjet::Parseroute).to receive(:all)
+          .and_raise(Mailjet::ApiError.new("403 Forbidden"))
+
+        payload = build_setup_payload(secrets: secrets)
+        make_setup_request(payload)
+
+        body = JSON.parse(last_response.body)
+        expect(body["success"]).to eq(false)
+        expect(body["error"]).to include("Access denied")
+      end
+
+      it "handles generic Mailjet errors" do
+        allow(Mailjet::Parseroute).to receive(:all)
+          .and_raise(Mailjet::ApiError.new("Something went wrong"))
+
+        payload = build_setup_payload(secrets: secrets)
+        make_setup_request(payload)
+
+        body = JSON.parse(last_response.body)
+        expect(body["success"]).to eq(false)
+        expect(body["error"]).to include("Mailjet API error")
+      end
+    end
+
+    context "when webhook URL cannot be retrieved" do
+      let(:secrets) do
+        {
+          "MAILJET_API_KEY" => "test_api_key",
+          "MAILJET_SECRET_KEY" => "test_secret_key"
+        }
+      end
+
+      before do
+        stub_request(:get, "https://kiket.test/api/v1/ext/webhook_url")
+          .with(query: { "action_name" => "inbound_email" })
+          .to_return(status: 200, body: { webhook_url: nil }.to_json)
+      end
+
+      it "returns error" do
+        payload = build_setup_payload(secrets: secrets)
+        make_setup_request(payload)
+
+        body = JSON.parse(last_response.body)
+        expect(body["success"]).to eq(false)
+        expect(body["error"]).to include("Could not retrieve webhook URL")
+      end
+    end
+  end
+
   describe "GET /health" do
     it "returns healthy status" do
       get "/health"
@@ -216,7 +476,10 @@ RSpec.describe MailjetInboundExtension do
     it "lists registered events" do
       get "/health"
       body = JSON.parse(last_response.body)
-      expect(body["registered_events"]).to eq([ "external.webhook.inbound_email" ])
+      expect(body["registered_events"]).to contain_exactly(
+        "external.webhook.inbound_email",
+        "mailjet.connectParseApi"
+      )
     end
   end
 end

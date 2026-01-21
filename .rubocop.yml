@@ -1,6 +1,9 @@
 # Extension-specific rubocop config
 # Does not inherit from parent (kiket repo uses rails-specific plugins)
 
+# Explicitly prevent inheritance from parent directories
+inherit_from: []
+
 plugins:
   - rubocop-rspec
 

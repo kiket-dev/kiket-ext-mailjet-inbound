@@ -34,9 +34,16 @@ class ExtensionCI
   def step(name, command)
     print "  #{name}... "
 
+    # Detect local SDK path if running in monorepo context
+    monorepo_sdk_path = File.expand_path('../../sdk/ruby', Dir.pwd)
+    local_sdk_path = File.directory?(monorepo_sdk_path) ? monorepo_sdk_path : nil
+
     # Clear parent bundler environment to use extension's own Gemfile
+    # but preserve local SDK override if available
     clean_env = ENV.to_h.reject { |k, _| k.start_with?('BUNDLE_') }
     clean_env['BUNDLE_GEMFILE'] = File.expand_path('Gemfile', Dir.pwd)
+    clean_env['BUNDLE_PATH'] = File.expand_path('vendor/bundle', Dir.pwd)
+    clean_env['BUNDLE_LOCAL__KIKET___SDK'] = local_sdk_path if local_sdk_path
 
     start_time = Time.now
     stdout, stderr, status = Open3.capture3(clean_env, command)

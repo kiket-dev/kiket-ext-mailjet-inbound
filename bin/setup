@@ -16,9 +16,16 @@ end
 FileUtils.chdir EXTENSION_ROOT do
   puts "== Setting up #{EXTENSION_NAME} extension =="
 
+  # Detect local SDK path if running in monorepo context
+  monorepo_sdk_path = File.expand_path('../../sdk/ruby', EXTENSION_ROOT)
+  local_sdk_path = File.directory?(monorepo_sdk_path) ? monorepo_sdk_path : nil
+
   # Clear parent bundler environment to use extension's own Gemfile
+  # but preserve local SDK override if available
   ENV.keys.grep(/^BUNDLE_/).each { |k| ENV.delete(k) }
   ENV['BUNDLE_GEMFILE'] = File.join(EXTENSION_ROOT, 'Gemfile')
+  ENV['BUNDLE_PATH'] = File.join(EXTENSION_ROOT, 'vendor', 'bundle')
+  ENV['BUNDLE_LOCAL__KIKET___SDK'] = local_sdk_path if local_sdk_path
 
   puts "\n== Installing dependencies =="
   if File.exist?('Gemfile.lock')

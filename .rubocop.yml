@@ -17,10 +17,40 @@ AllCops:
     - 'vendor/**/*'
 
 # Relaxed settings for extension code
+# Extensions tend to have self-contained, verbose code
+
 Metrics/BlockLength:
   Exclude:
     - 'spec/**/*'
 
+Metrics/ClassLength:
+  Max: 300
+
+Metrics/MethodLength:
+  Max: 60
+
+Metrics/AbcSize:
+  Max: 50
+
+Metrics/CyclomaticComplexity:
+  Max: 15
+
+Metrics/PerceivedComplexity:
+  Max: 15
+
+Layout/LineLength:
+  Max: 150
+
+Style/EmptyElse:
+  Enabled: false
+
+Style/Documentation:
+  Enabled: false
+
+Style/IfUnlessModifier:
+  Enabled: false
+
+# RSpec settings
 RSpec/ExampleLength:
   Max: 40
 
@@ -29,3 +59,24 @@ RSpec/MultipleExpectations:
 
 RSpec/NestedGroups:
   Max: 4
+
+RSpec/VerifiedDoubles:
+  Enabled: false
+
+RSpec/AnyInstance:
+  Enabled: false
+
+RSpec/MessageSpies:
+  Enabled: false
+
+RSpec/StubbedMock:
+  Enabled: false
+
+RSpec/SpecFilePathFormat:
+  Enabled: false
+
+Naming/PredicateMethod:
+  Enabled: false
+
+Naming/MethodParameterName:
+  MinNameLength: 1

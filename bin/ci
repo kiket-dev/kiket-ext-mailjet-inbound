@@ -21,7 +21,7 @@ class ExtensionCI
 
     Dir.chdir(File.expand_path('..', __dir__)) do
       step('Setup', 'bin/setup')
-      step('Lint: Rubocop', 'bundle exec rubocop --format simple')
+      step('Lint: Rubocop', 'bundle exec rubocop --ignore-parent-exclusion --format simple')
       step('Tests: RSpec', 'bundle exec rspec --format progress')
     end
 

@@ -1,5 +1,8 @@
 # Extension-specific rubocop config
 # Does not inherit from parent (kiket repo uses rails-specific plugins)
+#
+# Run with: bundle exec rubocop --ignore-parent-exclusion
+# The flag prevents scanning parent directories for exclude patterns
 
 # Explicitly prevent inheritance from parent directories
 inherit_from: []
@@ -10,7 +13,6 @@ plugins:
 AllCops:
   NewCops: enable
   TargetRubyVersion: 3.4
-  IgnoreParentExclusion: true
   Exclude:
     - 'vendor/**/*'
 

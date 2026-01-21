@@ -4,10 +4,10 @@
 # Extension CI script
 # Runs linting, security checks, and tests
 
-require "open3"
+require 'open3'
 
 class ExtensionCI
-  EXTENSION_NAME = "mailjet-inbound"
+  EXTENSION_NAME = 'mailjet-inbound'
 
   def initialize
     @results = []
@@ -15,14 +15,14 @@ class ExtensionCI
   end
 
   def run
-    puts "=" * 60
+    puts '=' * 60
     puts "Running CI for #{EXTENSION_NAME}"
-    puts "=" * 60
+    puts '=' * 60
 
-    Dir.chdir(File.expand_path("..", __dir__)) do
-      step("Setup", "bin/setup")
-      step("Lint: Rubocop", "bundle exec rubocop --format simple")
-      step("Tests: RSpec", "bundle exec rspec --format progress")
+    Dir.chdir(File.expand_path('..', __dir__)) do
+      step('Setup', 'bin/setup')
+      step('Lint: Rubocop', 'bundle exec rubocop --format simple')
+      step('Tests: RSpec', 'bundle exec rspec --format progress')
     end
 
     print_summary
@@ -35,8 +35,8 @@ class ExtensionCI
     print "  #{name}... "
 
     # Clear parent bundler environment to use extension's own Gemfile
-    clean_env = ENV.to_h.reject { |k, _| k.start_with?("BUNDLE_") }
-    clean_env["BUNDLE_GEMFILE"] = File.expand_path("Gemfile", Dir.pwd)
+    clean_env = ENV.to_h.reject { |k, _| k.start_with?('BUNDLE_') }
+    clean_env['BUNDLE_GEMFILE'] = File.expand_path('Gemfile', Dir.pwd)
 
     start_time = Time.now
     stdout, stderr, status = Open3.capture3(clean_env, command)
@@ -52,19 +52,19 @@ class ExtensionCI
 
       puts "\n    Output:"
       (stdout + stderr).lines.first(20).each { |line| puts "    #{line}" }
-      puts "    ... (truncated)" if (stdout + stderr).lines.count > 20
+      puts '    ... (truncated)' if (stdout + stderr).lines.count > 20
       puts
     end
   end
 
   def print_summary
-    puts "\n" + "=" * 60
+    puts "\n#{'=' * 60}"
     passed = @results.count { |r| r[:success] }
     total = @results.size
-    status = @failed ? "FAILED" : "PASSED"
+    status = @failed ? 'FAILED' : 'PASSED'
 
     puts "#{EXTENSION_NAME}: #{status} (#{passed}/#{total} steps)"
-    puts "=" * 60
+    puts '=' * 60
   end
 end
 

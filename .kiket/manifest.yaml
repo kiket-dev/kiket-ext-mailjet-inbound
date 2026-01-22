@@ -42,11 +42,14 @@ extension:
       default: "false"
       label: Accept Unknown Senders
       description: Create issues from emails sent by non-registered users
-    mailjet_inbound_email:
-      type: text
+  output_fields:
+    inbound_email:
       label: Mailjet Inbound Email
-      description: The email address configured in Mailjet (set automatically during setup)
-      readonly: true
+      description: |
+        Send emails to this address to automatically create issues.
+        Configure your email provider to forward to this address.
+      type: copyable
+      icon: envelope
   secrets:
     - key: MAILJET_API_KEY
       label: Mailjet API Key

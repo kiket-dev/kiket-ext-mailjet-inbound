@@ -3,6 +3,7 @@ extension:
   id: dev.kiket.ext.mailjet-inbound
   name: Mailjet Inbound
   version: 1.2.0
+  api_version: v1
   description: Process inbound emails from Mailjet Parse API and create issues or comments
   author: Kiket Team
   homepage: https://github.com/kiket-dev/kiket-ext-mailjet-inbound

@@ -82,35 +82,26 @@ class MailjetInboundExtension
     if existing_route
       # Update existing route if URL changed
       @logger.info "Found existing Mailjet parse route: #{existing_route.email}"
-      return {
-        success: true,
+      return KiketSDK.allow(
         message: 'Parse route already configured',
-        email: existing_route.email,
-        route_id: existing_route.id
-      }
+        data: { email: existing_route.email, route_id: existing_route.id },
+        output_fields: { 'inbound_email' => existing_route.email }
+      )
     end
 
     # Create new parse route
     route = create_parse_route(webhook_url, inbound_email)
-
-    # Store the inbound email in configuration for reference
-    if route.email
-      context[:client].patch('/api/v1/ext/configuration', {
-                               configuration: { mailjet_inbound_email: route.email }
-                             })
-    end
 
     context[:endpoints].log_event('mailjet.parse_route.created', {
                                     email: route.email,
                                     route_id: route.id
                                   })
 
-    {
-      success: true,
+    KiketSDK.allow(
       message: 'Successfully configured Mailjet Parse API',
-      email: route.email,
-      route_id: route.id
-    }
+      data: { email: route.email, route_id: route.id },
+      output_fields: { 'inbound_email' => route.email }
+    )
   rescue Mailjet::ApiError => e
     @logger.error "Mailjet API error: #{e.message}"
     error_message = parse_mailjet_error(e)

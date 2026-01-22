@@ -247,7 +247,6 @@ RSpec.describe MailjetInboundExtension do
           webhook_url: webhook_url,
           webhook_token: 'abc123token'
         }.to_json, headers: { 'Content-Type' => 'application/json' })
-
     end
 
     context 'with valid credentials' do

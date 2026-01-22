@@ -248,9 +248,6 @@ RSpec.describe MailjetInboundExtension do
           webhook_token: 'abc123token'
         }.to_json, headers: { 'Content-Type' => 'application/json' })
 
-      # Stub Kiket API for configuration update
-      stub_request(:patch, 'https://kiket.test/api/v1/ext/configuration')
-        .to_return(status: 200, body: { ok: true }.to_json, headers: { 'Content-Type' => 'application/json' })
     end
 
     context 'with valid credentials' do
@@ -276,9 +273,10 @@ RSpec.describe MailjetInboundExtension do
 
         expect(last_response.status).to eq(200)
         body = JSON.parse(last_response.body)
-        expect(body['success']).to be(true)
-        expect(body['email']).to eq('acme@parse-in1.mailjet.com')
-        expect(body['route_id']).to eq(12_345)
+        expect(body['status']).to eq('allow')
+        expect(body['metadata']['email']).to eq('acme@parse-in1.mailjet.com')
+        expect(body['metadata']['route_id']).to eq(12_345)
+        expect(body['metadata']['output_fields']['inbound_email']).to eq('acme@parse-in1.mailjet.com')
       end
 
       it 'configures Mailjet with provided credentials' do
@@ -316,16 +314,13 @@ RSpec.describe MailjetInboundExtension do
         make_setup_request(payload)
       end
 
-      it 'stores inbound email in configuration' do
+      it 'returns inbound email in output_fields' do
         payload = build_setup_payload(secrets: secrets)
 
         make_setup_request(payload)
 
-        expect(WebMock).to(have_requested(:patch, 'https://kiket.test/api/v1/ext/configuration')
-          .with do |req|
-            body = JSON.parse(req.body)
-            body['configuration']['mailjet_inbound_email'] == 'acme@parse-in1.mailjet.com'
-          end)
+        body = JSON.parse(last_response.body)
+        expect(body['metadata']['output_fields']['inbound_email']).to eq('acme@parse-in1.mailjet.com')
       end
 
       it 'logs parse route creation event' do
@@ -362,9 +357,10 @@ RSpec.describe MailjetInboundExtension do
         make_setup_request(payload)
 
         body = JSON.parse(last_response.body)
-        expect(body['success']).to be(true)
+        expect(body['status']).to eq('allow')
         expect(body['message']).to eq('Parse route already configured')
-        expect(body['route_id']).to eq(99_999)
+        expect(body['metadata']['route_id']).to eq(99_999)
+        expect(body['metadata']['output_fields']['inbound_email']).to eq('existing@parse-in1.mailjet.com')
       end
     end
 
